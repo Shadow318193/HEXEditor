@@ -1,1 +1,4 @@
 Программа использует библиотеку PyQT5, поэтому перед использованием надо его установить с помощью cmd команды: pip install PyQT5
+
+Translation:
+The program is using the library PyQT5, so before launching you must install it with cmd command: pip install PyQT5
