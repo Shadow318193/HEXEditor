@@ -3,9 +3,47 @@ import sys
 from PyQt5 import uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
-from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QTableWidgetItem
+from PyQt5.QtWidgets import QApplication, QWidget,\
+    QFileDialog, QTableWidgetItem, QPushButton
 
 import sqlite3
+
+
+class LanguageError(Exception):
+    pass
+
+
+def set_language(lang):
+    """
+    :param lang:
+    :return dict:
+    """
+
+    # Функция устанавливает язык.
+
+    language_pack = {}
+
+    correct_names = {"cancel", "cleaner", "opener", "chooseFile", "opened", "saver", "saveFile",
+                     "saved", "addBytes", "removeBytes", "labelRow", "lineEdit", "labelType",
+                     "types", "databaseTitle", "labelEnd", "no", "yes", "yes2", "add", "remove",
+                     "labelAdded", "labelChanged", "labelAddError", "labelRemove", "labelRemoved",
+                     "labelRemoveError", "languages", "languageTitle"}
+
+    with open(f"{lang}.txt", "r", encoding="utf-8") as language_file:
+        for line in language_file.readlines():
+            line = line.split("=")
+            if len(line) != 2 or line[0] not in correct_names:
+                raise LanguageError(f"File {lang}.txt has wrong format. Correct format "
+                                    "-> param=(translated word with {} "
+                                    "if it's necessary). Example is in en.txt")
+            language_pack[line[0]] = line[1]
+            correct_names.remove(line[0])
+
+    return language_pack
+
+
+language = "ru"
+language_dict = set_language(language)
 
 
 def hex_to_dec(n: str):
@@ -72,17 +110,34 @@ def color_item(item: QTableWidgetItem, end: int, byte: int):
     return item
 
 
+# TODO Перевод
 class HEXEditor(QWidget):
-    def __init__(self):
+    global language, language_dict
+
+    def __init__(self, application: QApplication):
         super().__init__()
         uic.loadUi('hex.ui', self)  # Загрузка интерфейса.
+        self.application = application
         self.initUI()
+
+        self.add_type_form = FileTypesForm(self)
+        self.languages_form = LanguagesForm(self, self.add_type_form)
 
         self.can_update = True  # Защита от не нужных обновлений таблицы.
 
     def initUI(self):
         self.setGeometry(300, 100, 1000, 500)
-        self.setWindowTitle('HEX Editor')
+        self.setWindowTitle('HEXEditor')
+
+        self.opener.setText(language_dict["opener"])
+        self.saver.setText(language_dict["saver"])
+        self.cleaner.setText(language_dict["cleaner"])
+        self.addBytes.setText(language_dict["addBytes"])
+        self.removeBytes.setText(language_dict["removeBytes"])
+        self.types.setText(language_dict["types"])
+        self.languages.setText(language_dict["languages"])
+        self.lineEdit.setPlaceholderText(language_dict["lineEdit"])
+        self.labelRow.setText(language_dict["labelRow"])
 
         self.opener.clicked.connect(self.open_file)  # Кнопка "Загрузить из файла".
         self.saver.clicked.connect(self.save_file)  # Кнопка "Сохранить файл".
@@ -91,7 +146,8 @@ class HEXEditor(QWidget):
         self.removeBytes.clicked.connect(self.remove_byte)  # Кнопка "Удалить строку байтов".
         self.spinBox.valueChanged.connect(self.update_data)  # Поле для смены кол-ва байт в строке.
         self.tableWidget.cellChanged.connect(self.update_data)  # Реакция на изменение данных в таблице.
-        self.addType.clicked.connect(self.add_type)  # Кнопка "Добавить тип файла в БД"
+        self.types.clicked.connect(self.open_file_types_form)  # Кнопка "Типы файлов"
+        self.languages.clicked.connect(self.open_languages_form)  # Кнопка "Язык (Language)"
         self.lineEdit.textChanged.connect(self.update_data)  # Реакция на изменение типа файла.
 
         # Установка шрифтов.
@@ -122,7 +178,7 @@ class HEXEditor(QWidget):
     def open_file(self):
         # Функция открывает файл и записывает двоичные данные файла в таблицу.
 
-        file_name = QFileDialog.getOpenFileName(self, "Выбрать файл...", "")[0]  # Открытие файла.
+        file_name = QFileDialog.getOpenFileName(self, language_dict["chooseFile"], "")[0]  # Открытие файла.
         file_type = file_name.split("/")[-1]
         if "." in file_type:
             self.lineEdit.setText(file_type.split(".")[-1].lower())
@@ -133,7 +189,7 @@ class HEXEditor(QWidget):
                 data = list(bytes(the_file.read()))  # Байты записываются в список data.
         except FileNotFoundError:
             # Если пользователь нажмёт кнопку "Отмена", вызовется исключение.
-            self.label.setText("Операция отменена.")
+            self.labelOp.setText(language_dict["cancel"])
         else:
             # Загрузка выполнена успешно.
             self.can_update = False  # Предотвращение выполнения функции update_data().
@@ -235,18 +291,17 @@ class HEXEditor(QWidget):
                     can_write_start = False
 
             # Уведомление пользователя.
-            self.label.setText(f"Данные из файла {file_name} загружены!")
+            self.labelOp.setText(language_dict["opened"].replace("{}", file_name))
 
             if header_end:
                 # Текст появляется, если тип файла присутствует в таблице.
-                self.label_type.setText(f"Данный тип файла предусмотрен в программе, " +
-                                        f"поэтому заголовок файла будет выделен светло-красным.")
+                self.labelType.setText(language_dict["labelType"])
 
         self.can_update = True
 
     def save_file(self):
         # Функция сохраняет данные в файл в двоичном виде.
-        file_name = QFileDialog.getSaveFileName(self, "Сохранить файл...", "")[0]  # Файл, куда данные сохранятся.
+        file_name = QFileDialog.getSaveFileName(self, language_dict["saveFile"], "")[0]  # Файл, куда данные сохранятся.
 
         try:
             # Процесс записи всех байтов в файл.
@@ -259,10 +314,10 @@ class HEXEditor(QWidget):
                 the_file.write(bytes(data))
         except FileNotFoundError:
             # Если пользователь нажмёт кнопку "Отмена", вызовется исключение.
-            self.label.setText("Операция отменена.")
+            self.labelOp.setText(language_dict["cancel"])
         else:
             # Уведомление пользователя.
-            self.label.setText(f"Файл {file_name} сохранён успешно!")
+            self.labelOp.setText(language_dict["saved"].replace("{}", file_name))
 
     def add_byte(self):
         # Добавляется строка с конца.
@@ -288,8 +343,8 @@ class HEXEditor(QWidget):
 
     def update_data(self):
         # Активируется при ручном изменении таблицы или других виджетов.
-        self.label.setText("")
-        self.label_type.setText("")
+        self.labelOp.setText("")
+        self.labelType.setText("")
 
         if self.can_update:
             self.can_update = False  # Защита от рекурсии.
@@ -347,7 +402,7 @@ class HEXEditor(QWidget):
                 button = ""  # Превращаем None в пустую строку.
 
             # Защита некоторых кнопок от не нужного обновления всей таблицы.
-            if button != "Добавить строку" and button != "Удалить строку":
+            if button != language_dict["addBytes"] and button != language_dict["removeBytes"]:
                 self.tableWidget.clear()
                 self.tableWidget.setColumnCount(bytes_in_row)
                 self.tableWidget.setRowCount(len(data) // bytes_in_row + 1)
@@ -380,7 +435,7 @@ class HEXEditor(QWidget):
             row = -1  # Переменная отвечает за запись соответствующего заголовка строки таблицы в виджет-список.
 
             for byte in range(len(data)):
-                if button != "Добавить строку" and button != "Удалить строку":
+                if button != language_dict["addBytes"] and button != language_dict["removeBytes"]:
                     # Запись байта в шестнадцатиричном представлении в таблицу.
                     cell = QTableWidgetItem(str(hex(data[byte])[2:].rjust(2, "0")))
                     cell.setTextAlignment(Qt.AlignCenter)
@@ -466,27 +521,37 @@ class HEXEditor(QWidget):
 
         self.can_update = True
 
-    def add_type(self):
+    def open_file_types_form(self):
         # Открывается форма добавления типа файла в таблицу.
-
-        self.add_type_form = AddTypeForm()
         self.add_type_form.show()  # Открытие формы.
 
+    def open_languages_form(self):
+        # Открывается форма выбора языка.
+        self.languages_form.show()  # Открытие формы.
 
-class AddTypeForm(QWidget):
-    def __init__(self):
+
+class FileTypesForm(QWidget):
+    def __init__(self, main=False):
         super().__init__()
-        uic.loadUi('add_type.ui', self)  # Загрузка интерфейса.
+        uic.loadUi('types.ui', self)  # Загрузка интерфейса.
         self.initUI()
+        self.main = main
 
     def initUI(self):
         self.setGeometry(325, 125, 75, 175)
-        self.setWindowTitle('Добавить тип файла...')
+        self.setWindowTitle(language_dict["databaseTitle"])
+
+        self.labelEnd.setText(language_dict["labelEnd"])
+        self.add.setText(language_dict["add"])
+        self.remove.setText(language_dict["remove"])
+        self.lineEdit2.setPlaceholderText(language_dict["lineEdit"])
+        self.no.setText(language_dict["no"])
 
         self.add.clicked.connect(self.add_type)  # Кнопка "Добавить".
-        self.lineEdit.textChanged.connect(self.update_data)
+        self.remove.clicked.connect(self.remove_type)  # Кнопка "Удалить".
+        self.lineEdit2.textChanged.connect(self.update_data)
         self.spinBox.valueChanged.connect(self.update_data)
-        self.yes.clicked.connect(self.dialogue)  # Кнопка "Поменять значение".
+        self.yes.clicked.connect(self.dialogue)  # Кнопка "Поменять значение" или "Подтвердить".
         self.no.clicked.connect(self.dialogue)  # Кнопка "Отменить действие".
         self.yes.hide()
         self.no.hide()
@@ -504,66 +569,155 @@ class AddTypeForm(QWidget):
             id_of_type = max([x[0] for x in id_of_type]) + 1  # Установка нового ID типу файла.
 
             cursor.execute(f'''
-            INSERT INTO file_types VALUES({id_of_type},"{self.lineEdit.text()}",{self.spinBox.text()})
+            INSERT INTO file_types VALUES({id_of_type},"{self.lineEdit2.text()}",{self.spinBox.text()})
             ''')  # Добавление типа файла.
         except sqlite3.IntegrityError:
             # Формат файла уже есть в БД.
 
             # Заморозка некоторых кнопок.
             self.add.setEnabled(False)
+            self.remove.setEnabled(False)
             self.spinBox.setEnabled(False)
-            self.lineEdit.setEnabled(False)
+            self.lineEdit2.setEnabled(False)
 
             # Показ диалоговых кнопок.
+            self.yes.setText(language_dict["yes"])
+
             self.yes.show()
             self.no.show()
 
             data_base.close()
 
             # Оповещение о существовании типа файла в БД.
-            self.label_2.setText("Такой тип файла уже есть в базе данных. " +
-                                 "Поменять значение конца заголовка у этого типа файла?")
+            self.labelWarning.setText(language_dict["labelAddError"])
         else:
             # Успешно добавлено.
             data_base.commit()  # Подтверждение добавки типа в БД. Без этой команды он не сохранится.
             data_base.close()
-            self.label_2.setText("Данный тип файла успешно добавлен в базу данных!")
+
+            self.labelWarning.setText(language_dict["labelAdded"])
+
+    def remove_type(self):
+        # Заморозка некоторых кнопок.
+        self.add.setEnabled(False)
+        self.remove.setEnabled(False)
+        self.spinBox.setEnabled(False)
+        self.lineEdit2.setEnabled(False)
+
+        # Показ диалоговых кнопок.
+        self.labelWarning.setText(language_dict["labelRemove"])
+        self.yes.setText(language_dict["yes2"])
+
+        self.yes.show()
+        self.no.show()
 
     def update_data(self):
         # При смене параметров оповещение пропадает, а текстовая линия делает текст маленького регистра.
-        self.lineEdit.setText(self.lineEdit.text().lower())
-        self.label_2.setText("")
+        self.lineEdit2.setText(self.lineEdit2.text().lower())
+        self.labelWarning.setText("")
 
     def dialogue(self):
-        if self.sender().text() == "Поменять значение":
+        if self.sender().text() == language_dict["yes"]:
             data_base = sqlite3.connect("file_types.sqlite")  # Подключение к БД.
             cursor = data_base.cursor()
 
             cursor.execute(f'''
             UPDATE file_types
             SET header_end = {self.spinBox.text()}
-            WHERE type = "{self.lineEdit.text()}"
+            WHERE type = "{self.lineEdit2.text()}"
             ''')  # Обновление формата.
 
             data_base.commit()  # Подтверждение изменения типа в БД. Без этой команды он не изменится.
             data_base.close()
-            self.label_2.setText(f"Значение конца заголовка типа файла {self.lineEdit.text()} успешно изменено!")
+
+            self.labelWarning.setText(language_dict["labelChanged"].replace("{}", self.lineEdit2.text()))
+
+        elif self.sender().text() == language_dict["yes2"]:
+            data_base = sqlite3.connect("file_types.sqlite")  # Подключение к БД.
+            cursor = data_base.cursor()
+            try:
+                id_of_type = cursor.execute(f'''
+                                        SELECT id FROM file_types
+                                        WHERE type = "{self.lineEdit2.text()}"
+                                        ''').fetchall()[0][0]  # Узнавание ID типа файла в БД.
+
+                cursor.execute(f'''
+                            DELETE from file_types
+                            where type = "{self.lineEdit2.text()}"
+                            ''')  # Удаление.
+
+                cursor.execute(f'''
+                            UPDATE file_types
+                            SET id = id - 1
+                            WHERE id > {id_of_type}
+                            ''')  # Переписываем ID послестоящих типов файлов.
+            except IndexError:
+                data_base.close()
+
+                # Оповещение о отсутствии типа файла в БД.
+                self.labelWarning.setText(language_dict["labelRemoveError"])
+            else:
+                # Успешно добавлено.
+                data_base.commit()  # Подтверждение удаления типа в БД. Без этой команды он не сохранится.
+                data_base.close()
+
+                self.labelWarning.setText(language_dict["labelRemoved"])
         else:
             # Возникает при нажатии кнопки "Отменить действие".
-            self.label_2.setText("Операция отменена.")
+            self.labelWarning.setText(language_dict["cancel"])
 
         # Разморозка замороженных объектов.
         self.add.setEnabled(True)
+        self.remove.setEnabled(True)
         self.spinBox.setEnabled(True)
-        self.lineEdit.setEnabled(True)
+        self.lineEdit2.setEnabled(True)
 
         # Скрытие диалоговых кнопок.
         self.yes.hide()
         self.no.hide()
 
 
+class LanguagesForm(QWidget):
+
+    def __init__(self, main=False, types_form=False):
+        super().__init__()
+        uic.loadUi('languages.ui', self)  # Загрузка интерфейса.
+        self.initUI()
+        self.main = main
+        self.types_form = types_form
+
+    def initUI(self):
+        global language
+
+        self.setGeometry(350, 150, 400, 100)
+        self.setWindowTitle(language_dict["languageTitle"])
+
+        # Устанавливание состояния кнопок
+        if language == "ru":
+            self.russian.checkStateSet()
+        elif language == "en":
+            self.english.checkStateSet()
+
+        self.russian.clicked.connect(self.switch_language)
+        self.english.clicked.connect(self.switch_language)
+
+    def switch_language(self):
+        global language, language_dict
+
+        if self.sender().text() == "Русский":
+            language = "ru"
+        elif self.sender().text() == "English":
+            language = "en"
+        language_dict = set_language(language)
+        self.setWindowTitle(language_dict["languageTitle"])
+        if isinstance(self.main, HEXEditor):
+            self.main.initUI()
+        if isinstance(self.types_form, FileTypesForm):
+            self.types_form.initUI()
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = HEXEditor()
+    ex = HEXEditor(app)
     ex.show()
     sys.exit(app.exec())
