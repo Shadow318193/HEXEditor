@@ -4,7 +4,7 @@ from PyQt5 import uic
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtWidgets import QApplication, QWidget,\
-    QFileDialog, QTableWidgetItem, QPushButton
+    QFileDialog, QTableWidgetItem
 
 import sqlite3
 
@@ -110,7 +110,6 @@ def color_item(item: QTableWidgetItem, end: int, byte: int):
     return item
 
 
-# TODO Перевод
 class HEXEditor(QWidget):
     global language, language_dict
 
