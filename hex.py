@@ -23,27 +23,29 @@ def set_language(lang):
 
     language_pack = {}
 
+    # Проверка текстового файла на правильность.
     correct_names = {"cancel", "cleaner", "opener", "chooseFile", "opened", "saver", "saveFile",
                      "saved", "addBytes", "removeBytes", "labelRow", "lineEdit", "labelType",
                      "types", "databaseTitle", "labelEnd", "no", "yes", "yes2", "add", "remove",
                      "labelAdded", "labelChanged", "labelAddError", "labelRemove", "labelRemoved",
                      "labelRemoveError", "languages", "languageTitle"}
 
-    with open(f"{lang}.txt", "r", encoding="utf-8") as language_file:
+    # Заполнение словаря.
+    with open(f"languages/{lang}.txt", "r", encoding="utf-8") as language_file:
         for line in language_file.readlines():
             line = line.split("=")
             if len(line) != 2 or line[0] not in correct_names:
                 raise LanguageError(f"File {lang}.txt has wrong format. Correct format "
                                     "-> param=(translated word with {} "
                                     "if it's necessary). Example is in en.txt")
-            language_pack[line[0]] = line[1]
+            language_pack[line[0]] = line[1].replace("\n", "")
             correct_names.remove(line[0])
 
     return language_pack
 
 
-language = "ru"
-language_dict = set_language(language)
+language = "ru"  # Изначальный язык
+language_dict = set_language(language)  # Слова
 
 
 def hex_to_dec(n: str):
@@ -116,27 +118,22 @@ class HEXEditor(QWidget):
     def __init__(self, application: QApplication):
         super().__init__()
         uic.loadUi('hex.ui', self)  # Загрузка интерфейса.
-        self.application = application
+        self.application = application  # Получение аппликации.
         self.initUI()
 
-        self.add_type_form = FileTypesForm(self)
-        self.languages_form = LanguagesForm(self, self.add_type_form)
+        self.types_form = FileTypesForm(self)  # Форма для связи с БД.
+        self.languages_form = LanguagesForm(self, self.types_form)  # Форма смены языка.
+        self.types_form.connect_languages_form(self.languages_form)
 
         self.can_update = True  # Защита от не нужных обновлений таблицы.
 
     def initUI(self):
+        # Установка параметров форме.
+
         self.setGeometry(300, 100, 1000, 500)
         self.setWindowTitle('HEXEditor')
 
-        self.opener.setText(language_dict["opener"])
-        self.saver.setText(language_dict["saver"])
-        self.cleaner.setText(language_dict["cleaner"])
-        self.addBytes.setText(language_dict["addBytes"])
-        self.removeBytes.setText(language_dict["removeBytes"])
-        self.types.setText(language_dict["types"])
-        self.languages.setText(language_dict["languages"])
-        self.lineEdit.setPlaceholderText(language_dict["lineEdit"])
-        self.labelRow.setText(language_dict["labelRow"])
+        self.language_set()
 
         self.opener.clicked.connect(self.open_file)  # Кнопка "Загрузить из файла".
         self.saver.clicked.connect(self.save_file)  # Кнопка "Сохранить файл".
@@ -173,6 +170,22 @@ class HEXEditor(QWidget):
         #                      ░░░████████▀████████░░░
         #                      ░░▄▄█▀▀▀▀█░░░█▀▀▀▀█▄▄░░
         #                      ░░▀▄▄▄▄▄▀▀░░░▀▀▄▄▄▄▄▀░░
+
+    def language_set(self):
+        # Присваивание языка интерфейсу.
+
+        self.opener.setText(language_dict["opener"])
+        self.saver.setText(language_dict["saver"])
+        self.cleaner.setText(language_dict["cleaner"])
+        self.addBytes.setText(language_dict["addBytes"])
+        self.removeBytes.setText(language_dict["removeBytes"])
+        self.types.setText(language_dict["types"])
+        self.languages.setText(language_dict["languages"])
+        self.lineEdit.setPlaceholderText(language_dict["lineEdit"])
+        self.labelRow.setText(language_dict["labelRow"])
+
+        self.labelOp.setText("")
+        self.labelType.setText("")
 
     def open_file(self):
         # Функция открывает файл и записывает двоичные данные файла в таблицу.
@@ -522,7 +535,7 @@ class HEXEditor(QWidget):
 
     def open_file_types_form(self):
         # Открывается форма добавления типа файла в таблицу.
-        self.add_type_form.show()  # Открытие формы.
+        self.types_form.show()  # Открытие формы.
 
     def open_languages_form(self):
         # Открывается форма выбора языка.
@@ -535,16 +548,17 @@ class FileTypesForm(QWidget):
         uic.loadUi('types.ui', self)  # Загрузка интерфейса.
         self.initUI()
         self.main = main
+        self.languages_form = False
+
+    def connect_languages_form(self, lang):
+        self.languages_form = lang
 
     def initUI(self):
-        self.setGeometry(325, 125, 75, 175)
-        self.setWindowTitle(language_dict["databaseTitle"])
+        # Установка параметров форме.
 
-        self.labelEnd.setText(language_dict["labelEnd"])
-        self.add.setText(language_dict["add"])
-        self.remove.setText(language_dict["remove"])
-        self.lineEdit2.setPlaceholderText(language_dict["lineEdit"])
-        self.no.setText(language_dict["no"])
+        self.setGeometry(325, 125, 75, 175)
+
+        self.language_set()
 
         self.add.clicked.connect(self.add_type)  # Кнопка "Добавить".
         self.remove.clicked.connect(self.remove_type)  # Кнопка "Удалить".
@@ -554,6 +568,19 @@ class FileTypesForm(QWidget):
         self.no.clicked.connect(self.dialogue)  # Кнопка "Отменить действие".
         self.yes.hide()
         self.no.hide()
+
+    def language_set(self):
+        # Присваивание языка интерфейсу.
+
+        self.setWindowTitle(language_dict["databaseTitle"])
+
+        self.labelEnd.setText(language_dict["labelEnd"])
+        self.add.setText(language_dict["add"])
+        self.remove.setText(language_dict["remove"])
+        self.lineEdit2.setPlaceholderText(language_dict["lineEdit"])
+        self.no.setText(language_dict["no"])
+
+        self.labelWarning.setText("")
 
     def add_type(self):
         # Добавление типа файла в БД.
@@ -578,6 +605,8 @@ class FileTypesForm(QWidget):
             self.remove.setEnabled(False)
             self.spinBox.setEnabled(False)
             self.lineEdit2.setEnabled(False)
+            if isinstance(self.languages_form, LanguagesForm):
+                self.languages_form.setEnabled(False)
 
             # Показ диалоговых кнопок.
             self.yes.setText(language_dict["yes"])
@@ -602,6 +631,8 @@ class FileTypesForm(QWidget):
         self.remove.setEnabled(False)
         self.spinBox.setEnabled(False)
         self.lineEdit2.setEnabled(False)
+        if isinstance(self.languages_form, LanguagesForm):
+            self.languages_form.setEnabled(False)
 
         # Показ диалоговых кнопок.
         self.labelWarning.setText(language_dict["labelRemove"])
@@ -670,6 +701,8 @@ class FileTypesForm(QWidget):
         self.remove.setEnabled(True)
         self.spinBox.setEnabled(True)
         self.lineEdit2.setEnabled(True)
+        if isinstance(self.languages_form, LanguagesForm):
+            self.languages_form.setEnabled(True)
 
         # Скрытие диалоговых кнопок.
         self.yes.hide()
@@ -686,6 +719,8 @@ class LanguagesForm(QWidget):
         self.types_form = types_form
 
     def initUI(self):
+        # Установка параметров форме.
+
         global language
 
         self.setGeometry(350, 150, 400, 100)
@@ -701,6 +736,8 @@ class LanguagesForm(QWidget):
         self.english.clicked.connect(self.switch_language)
 
     def switch_language(self):
+        # Смена языка
+
         global language, language_dict
 
         if self.sender().text() == "Русский":
@@ -710,9 +747,9 @@ class LanguagesForm(QWidget):
         language_dict = set_language(language)
         self.setWindowTitle(language_dict["languageTitle"])
         if isinstance(self.main, HEXEditor):
-            self.main.initUI()
+            self.main.language_set()
         if isinstance(self.types_form, FileTypesForm):
-            self.types_form.initUI()
+            self.types_form.language_set()
 
 
 if __name__ == '__main__':
